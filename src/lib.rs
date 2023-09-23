@@ -7,7 +7,6 @@
 //! ## Features
 //!
 //! - `encoding`: support non utf-8 payload
-#![allow(clippy::module_name_repetitions)]
 
 use std::ops::{Deref, DerefMut};
 
@@ -182,14 +181,13 @@ where
     T: Serialize,
 {
     fn into_response(self) -> Response {
-        let mut bytes = Vec::new();
-        match quick_xml::se::to_writer(&mut bytes, &self.0) {
-            Ok(_) => (
+        match quick_xml::se::to_string(&self.0) {
+            Ok(value) => (
                 [(
                     header::CONTENT_TYPE,
                     HeaderValue::from_static("application/xml"),
                 )],
-                bytes,
+                value,
             )
                 .into_response(),
             Err(err) => (
