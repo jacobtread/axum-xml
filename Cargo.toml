@@ -20,7 +20,6 @@ exclude = [
 encoding = ["quick-xml/encoding"]
 
 [dependencies]
-async-trait = "0.1"
 axum-core = "0.3"
 bytes = "1.5"
 http = "0.2"

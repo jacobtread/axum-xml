@@ -11,7 +11,6 @@
 
 use std::ops::{Deref, DerefMut};
 
-use async_trait::async_trait;
 use axum_core::extract::FromRequest;
 use axum_core::response::{IntoResponse, Response};
 use axum_core::BoxError;
@@ -100,7 +99,6 @@ mod tests;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Xml<T>(pub T);
 
-#[async_trait]
 impl<T, S, B> FromRequest<S, B> for Xml<T>
 where
     T: DeserializeOwned,
@@ -111,16 +109,31 @@ where
 {
     type Rejection = XmlRejection;
 
-    async fn from_request(req: Request<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let content_type = content_type(&req);
-        if !content_type.is_some_and(is_xml_type) {
-            return Err(XmlRejection::MissingXMLContentType);
-        }
+    fn from_request<'life0, 'async_trait>(
+        req: Request<B>,
+        state: &'life0 S,
+    ) -> core::pin::Pin<
+        Box<
+            dyn core::future::Future<Output = Result<Self, Self::Rejection>>
+                + core::marker::Send
+                + 'async_trait,
+        >,
+    >
+    where
+        'life0: 'async_trait,
+        Self: 'async_trait,
+    {
+        Box::pin(async move {
+            let content_type = content_type(&req);
+            if !content_type.is_some_and(is_xml_type) {
+                return Err(XmlRejection::MissingXMLContentType);
+            }
 
-        let bytes = Bytes::from_request(req, state).await?;
-        let value = quick_xml::de::from_reader(&*bytes)?;
+            let bytes = Bytes::from_request(req, state).await?;
+            let value = quick_xml::de::from_reader(&*bytes)?;
 
-        Ok(Self(value))
+            Ok(Self(value))
+        })
     }
 }
 
