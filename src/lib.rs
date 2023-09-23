@@ -112,41 +112,36 @@ where
     type Rejection = XmlRejection;
 
     async fn from_request(req: Request<B>, state: &S) -> Result<Self, Self::Rejection> {
-        if xml_content_type(&req) {
-            let bytes = Bytes::from_request(req, state).await?;
-
-            let value = quick_xml::de::from_reader(&*bytes)?;
-
-            Ok(Self(value))
-        } else {
-            Err(XmlRejection::MissingXMLContentType)
+        let content_type = content_type(&req);
+        if !content_type.is_some_and(is_xml_type) {
+            return Err(XmlRejection::MissingXMLContentType);
         }
+
+        let bytes = Bytes::from_request(req, state).await?;
+        let value = quick_xml::de::from_reader(&*bytes)?;
+
+        Ok(Self(value))
     }
 }
 
-fn xml_content_type<B>(req: &Request<B>) -> bool {
-    let content_type = if let Some(content_type) = req.headers().get(header::CONTENT_TYPE) {
-        content_type
-    } else {
-        return false;
-    };
+/// Obtains and parses the mime type of the Content-Type header
+fn content_type<B>(req: &Request<B>) -> Option<mime::Mime> {
+    req.headers()
+        // Get content type header
+        .get(header::CONTENT_TYPE)
+        // Get the header string value
+        .and_then(|value| value.to_str().ok())
+        // Parse the mime type
+        .and_then(|value| value.parse::<mime::Mime>().ok())
+}
 
-    let content_type = if let Ok(content_type) = content_type.to_str() {
-        content_type
-    } else {
-        return false;
-    };
-
-    let mime = if let Ok(mime) = content_type.parse::<mime::Mime>() {
-        mime
-    } else {
-        return false;
-    };
-
-    let is_xml_content_type = (mime.type_() == "application" || mime.type_() == "text")
-        && (mime.subtype() == "xml" || mime.suffix().map_or(false, |name| name == "xml"));
-
-    is_xml_content_type
+/// Checks whether the provided mime type can be considered xml
+fn is_xml_type(mime: mime::Mime) -> bool {
+    let type_ = mime.type_();
+    // Ensure the main type is application/ or text/
+    (type_ == "application" || type_ == "text")
+    // Ensure the subtype or suffix is xml
+        && (mime.subtype() == "xml" || mime.suffix().is_some_and(|value| value == "xml"))
 }
 
 impl<T> Deref for Xml<T> {
