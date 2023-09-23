@@ -1,8 +1,8 @@
 [package]
-name = "axum-xml"
-version = "0.2.0"
+name = "axum-xml-up"
+version = "0.1.0"
 edition = "2021"
-authors = ["LightQuantum <self@lightquantum.me>"]
+authors = ["LightQuantum <self@lightquantum.me>", "Jacobtread <jacobtread@gmail.com>"]
 description = "XML extractor for axum"
 repository = "https://github.com/PhotonQuantum/axum-xml"
 readme = "README.md"
@@ -34,7 +34,7 @@ thiserror = "1.0"
 axum = "0.6"
 reqwest = "0.11"
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.32", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros"] }
 tower = "0.4"
 tower-service = "0.3"
 uuid = { version = "1.4", features = ["serde"] }

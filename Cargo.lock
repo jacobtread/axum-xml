@@ -85,8 +85,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-xml"
-version = "0.2.0"
+name = "axum-xml-up"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
