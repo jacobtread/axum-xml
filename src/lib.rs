@@ -8,18 +8,17 @@
 //!
 //! - `encoding`: support non utf-8 payload
 
-use std::ops::{Deref, DerefMut};
-
-use axum_core::extract::FromRequest;
+use crate::rejection::XmlRejection;
+use axum_core::body::Body;
+use axum_core::extract::{FromRequest, Request};
 use axum_core::response::{IntoResponse, Response};
-use axum_core::BoxError;
 use bytes::Bytes;
-use http::{header, HeaderValue, Request, StatusCode};
-use http_body::Body as HttpBody;
+use core::pin::Pin;
+use http::{header, HeaderValue, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-
-use crate::rejection::XmlRejection;
+use std::future::Future;
+use std::ops::{Deref, DerefMut};
 
 mod rejection;
 #[cfg(test)]
@@ -41,7 +40,7 @@ mod tests;
 ///     Router,
 /// };
 /// use serde::Deserialize;
-/// use axum_xml::Xml;
+/// use axum_xml_up::Xml;
 ///
 /// #[derive(Deserialize)]
 /// struct CreateUser {
@@ -55,7 +54,8 @@ mod tests;
 ///
 /// let app = Router::new().route("/users", post(create_user));
 /// # async {
-/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+/// # axum::serve(listener, app).await.unwrap();
 /// # };
 /// ```
 ///
@@ -71,56 +71,47 @@ mod tests;
 ///     Router,
 /// };
 /// use serde::Serialize;
-/// use uuid::Uuid;
-/// use axum_xml::Xml;
+/// use axum_xml_up::Xml;
 ///
 /// #[derive(Serialize)]
 /// struct User {
-///     id: Uuid,
+///     id: u32,
 ///     username: String,
 /// }
 ///
-/// async fn get_user(Path(user_id) : Path<Uuid>) -> Xml<User> {
+/// async fn get_user(Path(user_id) : Path<u32>) -> Xml<User> {
 ///     let user = find_user(user_id).await;
 ///     Xml(user)
 /// }
 ///
-/// async fn find_user(user_id: Uuid) -> User {
+/// async fn find_user(user_id: u32) -> User {
 ///     // ...
 ///     # unimplemented!()
 /// }
 ///
 /// let app = Router::new().route("/users/:id", get(get_user));
 /// # async {
-/// # axum::Server::bind(&"".parse().unwrap()).serve(app.into_make_service()).await.unwrap();
+/// # let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+/// # axum::serve(listener, app).await.unwrap();
 /// # };
 /// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Xml<T>(pub T);
 
-impl<T, S, B> FromRequest<S, B> for Xml<T>
+impl<T, S> FromRequest<S> for Xml<T>
 where
     T: DeserializeOwned,
     S: Send + Sync,
-    B: HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<BoxError>,
 {
     type Rejection = XmlRejection;
 
-    fn from_request<'life0, 'async_trait>(
-        req: Request<B>,
-        state: &'life0 S,
-    ) -> core::pin::Pin<
-        Box<
-            dyn core::future::Future<Output = Result<Self, Self::Rejection>>
-                + core::marker::Send
-                + 'async_trait,
-        >,
-    >
+    fn from_request<'state, 'future>(
+        req: Request<Body>,
+        state: &'state S,
+    ) -> Pin<Box<dyn Future<Output = Result<Self, Self::Rejection>> + Send + 'future>>
     where
-        'life0: 'async_trait,
-        Self: 'async_trait,
+        'state: 'future,
+        Self: 'future,
     {
         Box::pin(async move {
             let content_type = content_type(&req);
@@ -129,6 +120,9 @@ where
             }
 
             let bytes = Bytes::from_request(req, state).await?;
+
+            println!("{:?}", bytes);
+
             let value = quick_xml::de::from_reader(&*bytes)?;
 
             Ok(Self(value))
@@ -137,7 +131,7 @@ where
 }
 
 /// Obtains and parses the mime type of the Content-Type header
-fn content_type<B>(req: &Request<B>) -> Option<mime::Mime> {
+fn content_type(req: &Request) -> Option<mime::Mime> {
     req.headers()
         // Get content type header
         .get(header::CONTENT_TYPE)

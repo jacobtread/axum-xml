@@ -1,16 +1,11 @@
-use std::net::{SocketAddr, TcpListener};
-use std::{assert_eq, println};
-
-use axum::body::{Body, HttpBody};
-use axum::routing::post;
-use axum::{BoxError, Router, Server};
-use http::{Request, StatusCode};
-use reqwest::RequestBuilder;
-use serde::Deserialize;
-use tower::make::Shared;
-use tower_service::Service;
-
 use crate::Xml;
+use axum::routing::post;
+use axum::Router;
+use reqwest::{RequestBuilder, StatusCode};
+use serde::Deserialize;
+use std::net::SocketAddr;
+use std::{assert_eq, println};
+use tokio::net::TcpListener;
 
 pub struct TestClient {
     client: reqwest::Client,
@@ -19,22 +14,17 @@ pub struct TestClient {
 
 impl TestClient {
     #[allow(clippy::type_repetition_in_bounds)]
-    pub(crate) fn new<S, ResBody>(svc: S) -> Self
-    where
-        S: Service<Request<Body>, Response = http::Response<ResBody>> + Clone + Send + 'static,
-        ResBody: HttpBody + Send + 'static,
-        ResBody::Data: Send,
-        ResBody::Error: Into<BoxError>,
-        S::Future: Send,
-        S::Error: Into<BoxError>,
-    {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("Could not bind ephemeral socket");
+    pub(crate) async fn new(svc: Router<()>) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("Could not bind ephemeral socket");
         let addr = listener.local_addr().unwrap();
         println!("Listening on {}", addr);
 
         tokio::spawn(async move {
-            let server = Server::from_tcp(listener).unwrap().serve(Shared::new(svc));
-            server.await.expect("server error");
+            axum::serve(listener, svc.into_make_service())
+                .await
+                .expect("server error");
         });
 
         Self {
@@ -52,6 +42,7 @@ impl TestClient {
 async fn deserialize_body() {
     #[derive(Debug, Deserialize)]
     struct Input {
+        #[serde(rename = "@foo")]
         foo: String,
     }
 
@@ -59,6 +50,7 @@ async fn deserialize_body() {
 
     let client = TestClient::new(app);
     let res = client
+        .await
         .post("/")
         .body(r#"<Input foo="bar"/>"#)
         .header("content-type", "application/xml")
@@ -74,6 +66,7 @@ async fn deserialize_body() {
 async fn consume_body_to_xml_requires_xml_content_type() {
     #[derive(Debug, Deserialize)]
     struct Input {
+        #[serde(rename = "@foo")]
         foo: String,
     }
 
@@ -81,6 +74,7 @@ async fn consume_body_to_xml_requires_xml_content_type() {
 
     let client = TestClient::new(app);
     let res = client
+        .await
         .post("/")
         .body(r#"<Input foo="bar"/>"#)
         .send()
@@ -101,9 +95,10 @@ async fn xml_content_types() {
 
         println!("testing {:?}", content_type);
 
-        let app = Router::new().route("/", post(|Xml(_): Xml<Value>| async {}));
+        let app: Router<_> = Router::new().route("/", post(|Xml(_): Xml<Value>| async {}));
 
         let res = TestClient::new(app)
+            .await
             .post("/")
             .header("content-type", content_type)
             .body("<Value />")
