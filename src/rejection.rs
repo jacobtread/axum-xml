@@ -8,7 +8,7 @@ use crate::IntoResponse;
 
 #[derive(Debug, Error)]
 pub enum XmlRejection {
-    #[error("Failed to parse the request body as XML: {0}")]
+    #[error("Failed to parse the request body as XML")]
     InvalidXMLBody(#[from] quick_xml::DeError),
     #[error("Expected request with `Content-Type: application/xml`")]
     MissingXMLContentType,

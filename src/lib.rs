@@ -21,8 +21,6 @@ use std::future::Future;
 use std::ops::{Deref, DerefMut};
 
 mod rejection;
-#[cfg(test)]
-mod tests;
 
 /// XML Extractor / Response.
 ///
