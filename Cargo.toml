@@ -1,6 +1,6 @@
 [package]
 name = "axum-xml-up"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["LightQuantum <self@lightquantum.me>", "Jacobtread <jacobtread@gmail.com>"]
 description = "XML extractor for axum"

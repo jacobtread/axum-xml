@@ -1,15 +1,22 @@
 # axum-xml-up
 
-[![crates.io](https://img.shields.io/crates/v/axum-xml?style=flat-square)](https://crates.io/crates/axum-xml)
-[![Documentation](https://img.shields.io/docsrs/axum-xml?style=flat-square)](https://docs.rs/axum-xml)
+[![crates.io](https://img.shields.io/crates/v/axum-xml-up?style=flat-square)](https://crates.io/crates/axum-xml-up)
+[![Documentation](https://img.shields.io/docsrs/axum-xml-up?style=flat-square)](https://docs.rs/axum-xml-up)
 
-> Fork of https://github.com/PhotonQuantum/axum-xml updating it to the latest axum 0.6 version
+> Fork of https://github.com/PhotonQuantum/axum-xml updating it to the latest axum 0.7 version
+> for axum 0.6 use v0.1 of this library
 
 XML extractor for axum.
 
 This crate provides struct `Xml` that can be used to extract typed information from request's body.
 
 Uses [quick-xml](https://github.com/tafia/quick-xml) to deserialize and serialize the payloads
+
+```toml
+[dependencies]
+axum-xml-up = "0.2"
+```
+
 
 ## Features
 
@@ -26,7 +33,7 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use axum_xml::Xml;
+use axum_xml_up::Xml;
 
 #[derive(Deserialize)]
 struct CreateUser {
@@ -41,10 +48,8 @@ async fn create_user(Xml(payload): Xml<CreateUser>) {
 #[tokio::main]
 async fn main() {
     let app = Router::new().route("/users", post(create_user));
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 ```
 
@@ -59,30 +64,28 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use axum_xml::Xml;
+use axum_xml_up::Xml;
 
 #[derive(Deserialize)]
 struct User {
-    id: Uuid,
+    id: u32,
     username: String,
 }
 
-async fn get_user(Path(user_id) : Path<Uuid>) -> Xml<User>  {
+async fn get_user(Path(user_id) : Path<u32>) -> Xml<User>  {
     let user = find_user(user_id).await;
     Xml(user)
 }
 
-async fn find_user(user_id: Uuid) -> User {
+async fn find_user(user_id: u32) -> User {
     unimplemented!();
 }
 
 #[tokio::main]
 async fn main() {
     let app = Router::new().route("/users", get(get_user));
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 ```
 
